@@ -1,0 +1,86 @@
+---
+- name: SECURITY GROUP FOR TEST INSTANCE
+  ec2_group:
+    name: TEST-SG
+    description: Security Group for Test Instance
+    aws_access_key: "{{ aws_access_key | default('null') }}"
+    aws_secret_key: "{{ aws_secret_key | default('null') }}"
+    vpc_id: "{{ vpc_id | default('default') }}"
+    region: "{{ aws_region }}"
+    rules:
+      - proto: tcp
+        ports: 80
+        cidr_ip: 0.0.0.0/0
+        rule_desc: Security Group for Test Instance
+  register: security_group
+
+- name: AWS AUTOSCALING LAUNCH CONFIGURATION
+  ec2_lc:
+    name: TEST-LC
+    image_id: "{{ image_id }}"
+    key_name: "{{ key_name }}"
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key | default('null') }}"
+    aws_secret_key: "{{ aws_secret_key | default('null') }}"
+    vpc_id: "{{ vpc_id | default('default') }}"
+    security_groups: "{{ security_groups | default('TEST-SG') }}"
+    instance_type: "{{ instance_type | default('t2.micro') }}"
+    assign_public_ip: yes
+    user_data: "{{ ec2_userdata }}" 
+  register: launch_config  
+ 
+- name: AWS AUTO SCALING GROUP
+  ec2_asg:
+    name: TEST-ASG
+    launch_config_name: TEST-LC
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key | default('null') }}"
+    aws_secret_key: "{{ aws_secret_key | default('null') }}"
+    availability_zones: [ '{{ aws_az1 }}', '{{ aws_az2 }}']
+    vpc_zone_identifier: [ '{{ subnet1 }}', '{{ subnet2 }}' ]
+    validate_certs: no
+    health_check_period: 60
+    health_check_type: ELB
+    replace_all_instances: yes
+    min_size: 1
+    max_size: 5
+    desired_capacity: 1
+    tags:
+      - Environment: Test
+  register: scaling_group
+
+- name: ADDING INSTANCE TO TARGET GROUP
+  elb_target_group:
+    name: TEST-TG
+    aws_access_key: "{{ aws_access_key | default('null') }}"
+    aws_secret_key: "{{ aws_secret_key | default('null') }}"
+    region: "{{ aws_region }}"
+    vpc_id: "{{ vpc_id }}"
+    validate_certs: no
+    health_check_path: /
+    protocol: http
+    port: 80
+    wait: yes
+    state: present
+  register: target_group
+
+- name: CREATE APPLICATION LOAD BALANCER
+  elb_application_lb:
+    name: TEST-ALB
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key | default('null') }}"
+    aws_secret_key: "{{ aws_secret_key | default('null') }}"
+    security_groups: "{{ security_groups | default('TEST-SG') }}"
+    validate_certs: no
+    subnets: 
+      - "{{ subnet1 }}"
+      - "{{ subnet2 }}"
+    listeners:
+      - Protocol: HTTP
+        Port: 80
+        DefaultActions:
+          - Type: forward
+            TargetGroupName: TEST-TG
+    wait: yes
+    state: present
+  register: alb
