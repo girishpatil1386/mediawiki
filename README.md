@@ -42,5 +42,5 @@ RUN the playbook using below command: (Require Ansible engine version 2.9)
  # ansible-playbook playbook.yml 
 
 
-*******IMP NOTICE*******
+*******IMP*******
 Once the Instance is provisioned Don't forget to add to TargetGroup "TEST-TG" for Load Balancing. 
