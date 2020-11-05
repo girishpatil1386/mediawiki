@@ -1,0 +1,6 @@
+ec2_userdata: | 
+         #!/bin/bash   
+         dnf install httpd php php-mysqlnd php-gd php-xml mariadb-server mariadb php-mbstring php-json
+         systemctl start mariadb
+         systemctl enable mariadb
+         systemctl enable httpd

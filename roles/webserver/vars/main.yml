@@ -1,10 +1,10 @@
-aws_region: 
-aws_access_key: 
-aws_secret_key: 
+aws_region: *********
+aws_access_key: *********
+aws_secret_key: *********
 image_id: ami-0e8834a21d50f1979
-vpc_id: 
-subnet1: 
-subnet2: 
-aws_az1: 
-aws_az2: 
-key_name: 
+vpc_id: ***********
+subnet1: **********
+subnet2: **********
+aws_az1: **********
+aws_az2: **********
+key_name: *********
