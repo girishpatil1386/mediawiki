@@ -37,5 +37,5 @@ RUN the playbook using below command: (Require Ansible engine version 2.9)
  # ansible-playbook playbook.yml
 
 NOTE: Blue-Green Deployment URL's
-      Before Upgrade: http://public-ipv4-dns/mediawiki-1.35
-      After Upgrade: http://public-ipv4-dns/mediawiki/index.php?title=Main_Page 
+      Before Upgrade: http://alb-dnsname/mediawiki-1.35
+      After Upgrade: http://alb-dnsname/mediawiki/index.php?title=Main_Page 
