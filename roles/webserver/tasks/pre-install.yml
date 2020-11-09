@@ -1,0 +1,67 @@
+- name: CREATE VIRTUAL PRIVATE CLOUD
+  ec2_vpc_net:
+    name: TEST-VPC
+    cidr_block: "{{ cidr_block }}"
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key | default('null') }}"
+    aws_secret_key: "{{ aws_secret_key | default('null') }}"
+    state: present
+    validate_certs: false
+  register: vpc
+ 
+- name: CREATE SUBNET FOR VPC
+  ec2_vpc_subnet: 
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key | default('null') }}"
+    aws_secret_key: "{{ aws_secret_key | default('null') }}"
+    vpc_id: "{{ vpc.vpc.id }}"
+    az: "{{ item.aws_az }}"
+    cidr: "{{ item.cidr }}"
+    map_public: yes
+    validate_certs: false
+    state: present
+    wait: yes
+    tags:
+      Name: "{{ item.name }}"
+      vpc_id: "{{ vpc.vpc.id }}"
+  loop: "{{ aws_vars }}" 
+  register: subnets
+
+- name: Get VPC SUBNET DETAILS
+  ec2_vpc_subnet_facts:
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key | default('null') }}"
+    aws_secret_key: "{{ aws_secret_key | default('null') }}"
+    filters:
+      vpc-id: "{{ vpc.vpc.id }}"
+  register: vpc_facts
+
+- name: SUBNET FACTS DETAILS
+  set_fact:
+    vpc_subnets: "{{ vpc_facts.subnets|selectattr('subnet_id')|map(attribute='id')|list }}"
+
+- name: AVAILIBILTY ZONES FATCS DETAILS
+  set_fact:
+    vpc_az: "{{ vpc_facts.subnets|selectattr('availability_zone')|map(attribute='availability_zone')|list }}"
+
+- name: CREATE INTERNET GATEWAY FOR "{{ vpc.vpc.id }}"
+  ec2_vpc_igw:
+    vpc_id: "{{ vpc.vpc.id }}"
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key | default('null') }}"
+    aws_secret_key: "{{ aws_secret_key | default('null') }}"
+    state: present
+  register: igw
+
+- name: SETUP SUBNET TO ROUTE TABLE
+  ec2_vpc_route_table:
+    vpc_id: "{{ vpc.vpc.id }}"
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key | default('null') }}"
+    aws_secret_key: "{{ aws_secret_key | default('null') }}"
+    subnets: "{{ vpc_subnets }}"
+    routes:
+      - dest: 0.0.0.0/0
+        gateway_id: "{{ igw.gateway_id }}"
+    state: present
+  register: public_route_table

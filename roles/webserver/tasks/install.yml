@@ -1,0 +1,136 @@
+- name: SECURITY GROUP FOR TEST INSTANCE
+  ec2_group:
+    name: TEST-SG
+    description: Security Group for Test Instance
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key | default('null') }}"
+    aws_secret_key: "{{ aws_secret_key | default('null') }}"
+    vpc_id: "{{ vpc.vpc.id }}"
+    rules:
+      - proto: tcp
+        ports: 80
+        cidr_ip: 0.0.0.0/0
+        rule_desc: Security Group for Test Instance
+  register: security_group
+
+- name: CREATE EC2 KEYPAIR 
+  ec2_key:
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key | default('null') }}"
+    aws_secret_key: "{{ aws_secret_key | default('null') }}"
+    name: ec2_keypair
+  register: keypair
+
+- name: COPYING EC2 KEYPAIR LOCALLY FOR SSH
+  copy: content="{{ keypair.key.private_key }}" dest="ec2_key.pem"
+  no_log: true
+  when: keypair.changed == true
+
+
+- name: AWS AUTOSCALING LAUNCH CONFIGURATION
+  ec2_lc:
+    name: TEST-LC
+    image_id: "{{ image_id }}"
+    key_name: "{{ key_name }}"
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key | default('null') }}"
+    aws_secret_key: "{{ aws_secret_key | default('null') }}"
+    vpc_id: "{{ vpc.vpc.id }}"
+    security_groups: "{{ security_groups | default('TEST-SG') }}"
+    instance_type: "{{ instance_type | default('t2.micro') }}"
+    assign_public_ip: yes
+    user_data: "{{ ec2_userdata }}" 
+  register: launch_config  
+ 
+- name: AWS AUTO SCALING GROUP
+  ec2_asg:
+    name: TEST-ASG
+    launch_config_name: TEST-LC
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key | default('null') }}"
+    aws_secret_key: "{{ aws_secret_key | default('null') }}"
+    availability_zones: "{{ vpc_az }}" 
+    vpc_zone_identifier: "{{ vpc_subnets }}" 
+    validate_certs: no
+    health_check_period: 60
+    health_check_type: ELB
+    replace_all_instances: yes
+    min_size: 1
+    max_size: 5
+    desired_capacity: 1
+    tags:
+      - Environment: Test
+  register: scaling_group
+
+- name: AUTO-SCALING POLICY
+  ec2_scaling_policy:
+    name: AutoScale-Policy
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key | default('null') }}"
+    aws_secret_key: "{{ aws_secret_key | default('null') }}"
+    adjustment_type: "ChangeInCapacity"
+    asg_name: TEST-ASG
+    scaling_adjustment: -1
+    min_adjustment_step: 1
+    cooldown: 300
+  register: auto_scale
+
+- name: ADDING PAUSE DELAY FOR INSTANCE TO BECOME ACTIVE
+  pause:
+    minutes: 3
+
+- name: GET INSTANCE INFORMATION
+  ec2_instance_info:
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key | default('null') }}"
+    aws_secret_key: "{{ aws_secret_key | default('null') }}"
+    filters:
+      vpc-id: "{{ vpc.vpc.id }}"
+  register: instance_info
+
+- name: GET INSTANCE DETAILS
+  set_fact:
+      instance_id: "{{ instance_info.instances|selectattr('instance_id')|map(attribute='instance_id')|list }}"
+
+- name: ADDING INSTANCE TO TARGET GROUP
+  elb_target_group:
+    name: TEST-TG
+    aws_access_key: "{{ aws_access_key | default('null') }}"
+    aws_secret_key: "{{ aws_secret_key | default('null') }}"
+    region: "{{ aws_region | default('TEST-VPC') }}"
+    target_type: instance
+    health_check_interval: 30
+    health_check_path: /
+    health_check_protocol: http
+    health_check_timeout: 15
+    protocol: http
+    port: 80
+    vpc_id: "{{ vpc.vpc.id }}"
+    successful_response_codes: "200"
+    targets:
+      - Id: "{{ item }}"
+        Port: 80
+    validate_certs: no
+    state: present
+  with_items: "{{ instance_id }}"
+  register: target_group
+
+- name: CREATE APPLICATION LOAD BALANCER
+  elb_application_lb:
+    name: TEST-ALB
+    region: "{{ aws_region }}"
+    aws_access_key: "{{ aws_access_key | default('null') }}"
+    aws_secret_key: "{{ aws_secret_key | default('null') }}"
+    security_groups: "{{ security_groups | default('TEST-SG') }}"
+    validate_certs: no
+    subnets: "{{ vpc_subnets }}"
+    listeners:
+      - Protocol: HTTP
+        Port: 80
+        DefaultActions:
+          - Type: forward
+            TargetGroupName: TEST-TG
+    wait: yes
+    state: present
+  register: alb
+
