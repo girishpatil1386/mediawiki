@@ -31,7 +31,6 @@
   ec2_lc:
     name: TEST-LC
     image_id: "{{ image_id }}"
-    key_name: "{{ key_name }}"
     region: "{{ aws_region }}"
     aws_access_key: "{{ aws_access_key | default('null') }}"
     aws_secret_key: "{{ aws_secret_key | default('null') }}"
