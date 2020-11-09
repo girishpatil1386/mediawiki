@@ -2,7 +2,7 @@
 Automate the Deployment of MediaWiki Webserver on AWS Instance
 
 
-Description: Ansible Playbook to Automate the Installation of Security Group, Application Load Balancer, Target Group, Auto-Scaling Group. The playbook is tested on Ansible version 2.9
+Description: Ansible Playbook to Automate the Installation of Security Group, Application Load Balancer, Target Group, Auto-Scaling Group, VPC, Subnets, AZ. The playbook is tested on Ansible version 2.9
 
 ## Role Variables ##
 Include the variables to roles/ec2_provisioning/vars/main.yml file
