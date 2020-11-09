@@ -19,11 +19,11 @@
     aws_access_key: "{{ aws_access_key | default('null') }}"
     aws_secret_key: "{{ aws_secret_key | default('null') }}"
     name: ec2_keypair
+  no_log: true
   register: keypair
 
 - name: COPYING EC2 KEYPAIR LOCALLY FOR SSH
   copy: content="{{ keypair.key.private_key }}" dest="ec2_key.pem"
-  no_log: true
   when: keypair.changed == true
 
 
